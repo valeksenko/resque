@@ -55,8 +55,13 @@ module Resque
     end
 
     # Clear all failure jobs
-    def self.clear
-      backend.clear
+    def self.clear(klazz=nil)
+      backend.clear(klazz)
+    end
+
+    # Requeue and clear failure jobs for a class
+    def self.requeue_and_clear(klazz)
+      backend.requeue_and_clear(klazz)
     end
 
     def self.requeue(index)

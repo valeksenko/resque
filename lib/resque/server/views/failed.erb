@@ -1,22 +1,81 @@
-<%start = params[:start].to_i %>
-<%failed = Resque::Failure.all(start, 20)%>
-<% index = 0 %>
-<% date_format = "%Y/%m/%d %T %z" %>
+<%
+start = params[:start].to_i
+klazz = params[:class]
+index = 0
+date_format = "%Y/%m/%d %T %z"
+highlight_amount = 1_000
+failed = []
+amount = (Resque::Failure.count > 20_000) ? 1_000 : 20
+totals = Hash.new(0)
+
+if Resque::Failure.count < 100_000
+
+  failed_index = 0
+  i = 0
+  begin
+    messages = Resque::Failure.all(i, amount)
+    messages.each do |m|
+      next if (m.nil? || m['payload'].nil? || m['payload']['class'].nil?)
+      totals[m['payload']['class']] += 1
+      if m['payload']['class'] == klazz
+        failed << m if (failed_index >= start) && (failed.size < amount)
+        failed_index += 1
+      end 
+    end
+    i += amount
+  end while messages.size == amount
+
+  if klazz
+    total = totals[klazz]
+  else
+    failed = Resque::Failure.all(start, amount)
+    total = Resque::Failure.count
+  end
+
+  too_many = false
+
+else
+  failed = Resque::Failure.all(start, amount)
+  total = Resque::Failure.count
+  too_many = true
+end
+%>
 
 <h1>Failed Jobs</h1>
 <%unless failed.empty?%>
-<form method="POST" action="<%=u 'failed/clear'%>">
-  <input type='submit' name='' value='Clear Failed Jobs' />
+<form method="POST" action="<%=u 'failed/clear', klazz %>">
+  <input type='submit' name='' value='Clear <%= klazz %> Failed Jobs' />
 </form>
 <form method="POST" action="<%=u 'failed/requeue/all'%>">
   <input type='submit' name='' value='Retry Failed Jobs' />
 </form>
 <%end%>
 
-<p class='sub'>Showing <%=start%> to <%= start + 20 %> of <b><%= size = Resque::Failure.count %></b> jobs</p>
+<% if too_many %>
+<b>Note: too many failed jobs, event grouping disabled</b>
+<% else %>
+<h2>Summary</h2>
+<p>
+  <table>
+    <% totals.each do |k,v| %>
+    <tr>
+      <th><a href="/failed?class=<%= k %>"><span class="failed"><%= k %></span></a></th>
+      <td class="failed<%= (v.to_i > highlight_amount) ? '_many' : '' %>"><%= v %></td>
+      <td>
+        <form method='POST' action='<%=u "failed/requeue_and_clear/#{ k }" %>' style='padding-top: 10px;'>
+          <input type='submit' name='' value='Retry and Delete' />
+        </form>
+      </td>
+    </tr>
+    <% end %>
+  </table>
+</p>
+<% end %>
+
+<p class='sub'>Showing <%=start%> to <%= start + amount %> of <b><%= total %></b> jobs</p>
 
 <ul class='failed'>
-  <%for job in failed%>
+  <%for job in failed.select { |j| j && j['worker'] } %>
     <% index += 1 %>
     <li>
       <dl>
@@ -63,5 +122,5 @@
   <%end%>
 </ul>
 
-<%= partial :next_more, :start => start, :size => size %>
+<%= partial :next_more, :start => start, :size => total %>
 

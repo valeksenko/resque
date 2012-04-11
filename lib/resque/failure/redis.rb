@@ -25,8 +25,21 @@ module Resque
         Resque.list_range(:failed, start, count)
       end
 
-      def self.clear
-        Resque.redis.del(:failed)
+      def self.clear(klazz)
+        if klazz
+          handle_class(klazz) do |item|
+            puts "Dropping #{ item['payload']['class'] }"
+          end
+        else
+          Resque.redis.del(:failed)
+        end
+      end
+
+      def self.requeue_and_clear(klazz)
+        handle_class(klazz) do |item|
+          puts "Dropping #{ item['payload']['class'] }"
+          Job.create(item['queue'], item['payload']['class'], *item['payload']['args'])
+        end
       end
 
       def self.requeue(index)
@@ -34,6 +47,21 @@ module Resque
         item['retried_at'] = Time.now.strftime("%Y/%m/%d %H:%M:%S")
         Resque.redis.lset(:failed, index, Resque.encode(item))
         Job.create(item['queue'], item['payload']['class'], *item['payload']['args'])
+      end
+
+      def self.handle_class(klazz, &block)
+        items = []
+        while(raw = Resque.redis.lpop(:failed)) do
+          items << Resque.decode(raw)
+        end
+
+        items.each do |item|
+          if item['payload']['class'] == klazz
+            block.call(item)
+          else
+            Resque.redis.rpush(:failed, Resque.encode(item))
+          end
+        end
       end
 
       def self.remove(index)

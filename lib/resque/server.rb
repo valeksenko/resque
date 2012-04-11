@@ -35,7 +35,7 @@ module Resque
       end
 
       def url_path(*path_parts)
-        [ path_prefix, path_parts ].join("/").squeeze('/')
+        [ path_prefix, path_parts ].flatten.compact.join("/").squeeze('/')
       end
       alias_method :u, :url_path
 
@@ -173,6 +173,20 @@ module Resque
       redirect u('queues')
     end
 
+    %w( overview workers ).each do |page|
+      get "/#{page}.poll" do
+        content_type "text/plain"
+        @polling = true
+        show(page.to_sym, false).gsub(/\s{1,}/, ' ')
+      end
+    end
+
+    post "/workers/:id/kill" do
+      hostname, pid, _ = params[:id].split(':')
+      Resque.push("techops.#{ hostname.split('.')[0] }", :class => 'KillWorkerEvent', :args => [{ :pid => pid }])
+      redirect u("/workers/#{ params[:id] }")
+    end
+
     get "/failed/?" do
       if Resque::Failure.url
         redirect Resque::Failure.url
@@ -181,8 +195,18 @@ module Resque
       end
     end
 
+    post "/failed/clear/:klazz" do
+      Resque::Failure.clear(params[:klazz])
+      redirect u('failed')
+    end
+
     post "/failed/clear" do
       Resque::Failure.clear
+      redirect u('failed')
+    end
+
+    post "/failed/requeue_and_clear/:klazz" do
+      Resque::Failure.requeue_and_clear(params[:klazz])
       redirect u('failed')
     end
 

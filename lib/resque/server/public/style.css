@@ -44,6 +44,7 @@ body { padding:0; margin:0; }
 #main table.workers td.icon img { height: 16px; width: 16px; }
 #main table.workers td.where { width:25%;}
 #main table.workers td.queues { width:35%;}
+#main table.workers td.action { width:10%;}
 #main .queue-tag { background:#b1d2e9; padding:2px; margin:0 3px; font-size:80%; text-decoration:none; text-transform:uppercase; font-weight:bold; color:#3274a2; -webkit-border-radius:4px; -moz-border-radius:4px;}
 #main table.workers td.queues.queue { width:10%;}
 #main table.workers td.process { width:35%;}
@@ -51,6 +52,7 @@ body { padding:0; margin:0; }
 #main table.workers td.process small { font-size:80%; margin-left:5px;}
 #main table.workers td.process code { font-family:Monaco, "Courier New", monospace; font-size:90%;}
 #main table.workers td.process small a { color:#999;}
+#main table.workers td.action form { float:left;padding-top: 10px;}
 #main.polling table.workers tr.working td { background:#f4ffe4; color:#7ac312;}
 #main.polling table.workers tr.working td.where a { color:#7ac312;}
 #main.polling table.workers tr.working td.process code { font-weight:bold;}
@@ -84,3 +86,5 @@ body { padding:0; margin:0; }
 #main form {float:right; margin-top:-10px;margin-left:10px;}
 
 #main .time a.toggle_format {text-decoration:none;}
+
+#main td.failed_many { font-weight:bold; color:#ce1212; }
