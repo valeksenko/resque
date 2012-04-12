@@ -11,18 +11,19 @@ totals = Hash.new(0)
 if Resque::Failure.count < 100_000
 
   failed_index = 0
-  i = 0
+  last_index = 0
   begin
-    messages = Resque::Failure.all(i, amount)
-    messages.each do |m|
+    messages = Resque::Failure.all(last_index, amount)
+    messages.each_with_index do |m, i|
       next if (m.nil? || m['payload'].nil? || m['payload']['class'].nil?)
       totals[m['payload']['class']] += 1
       if m['payload']['class'] == klazz
+        m['index'] = last_index + i
         failed << m if (failed_index >= start) && (failed.size < amount)
         failed_index += 1
       end 
     end
-    i += amount
+    last_index += amount
   end while messages.size == amount
 
   if klazz
@@ -75,27 +76,28 @@ end
 <p class='sub'>Showing <%=start%> to <%= start + amount %> of <b><%= total %></b> jobs</p>
 
 <ul class='failed'>
-  <%for job in failed.select { |j| j && j['worker'] } %>
+  <%for job in failed %>
     <% index += 1 %>
     <li>
       <dl>
-        <% if job.nil? %>
+        <% if job.nil? || job['worker'].nil? %>
         <dt>Error</dt>
         <dd>Job <%= index%> could not be parsed; perhaps it contains invalid JSON?</dd>
         <% else %>
+        <% real_index = job['index'] || (start + index - 1) %>
         <dt>Worker</dt>
         <dd>
           <a href="<%= u(:workers, job['worker']) %>"><%= job['worker'].split(':')[0...2].join(':') %></a> on <b class='queue-tag'><%= job['queue'] %></b > at <b><span class="time"><%= Time.parse(job['failed_at']).strftime(date_format) %></span></b>
           <% if job['retried_at'] %>
             <div class='retried'>
               Retried <b><span class="time"><%= Time.parse(job['retried_at']).strftime(date_format) %></span></b>
-              <a href="<%= u "failed/remove/#{start + index - 1}" %>" class="remove" rel="remove">Remove</a>
+              <a href="<%= u "failed/remove/#{real_index}" %>" class="remove" rel="remove">Remove</a>
             </div>
           <% else %>
             <div class='controls'>
-              <a href="<%= u "failed/requeue/#{start + index - 1}" %>" rel="retry">Retry</a>
+              <a href="<%= u "failed/requeue/#{real_index}" %>" rel="retry">Retry</a>
               or
-              <a href="<%= u "failed/remove/#{start + index - 1}" %>" rel="remove">Remove</a>
+              <a href="<%= u "failed/remove/#{real_index}" %>" rel="remove">Remove</a>
             </div>
           <% end %>
         </dd>
